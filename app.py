@@ -7,12 +7,11 @@ from scipy.ndimage import gaussian_filter, sobel
 import time
 
 # inicialização das constantes
-MIN_RADIUS = 5
+MIN_RADIUS = 1
 MAX_RADIUS = 205
-RADIUS_STEP = 5  # diferença entre cada raio (no array de raios)
-COROA_WIDTH = 5
+COROA_WIDTH = [0, 1, 5, 10] # testes
 EDGE_LIMIT = 0.005  # limite do contorno
-INNER_CIRCLE_SCALE = 1.1
+INNER_CIRCLE_SCALE = 1.1 # testes
 ROUND_OUTPUT = 3
 MAX_RECOMMENDED_DENSITY = 0.25
 
@@ -24,7 +23,7 @@ st.subheader(
 )
 st.write(
     f"Tamanho mínimo do círculo = {MIN_RADIUS} px ; ",
-    f"Tamanho máximo do círculo = {MAX_RADIUS - RADIUS_STEP} px",
+    f"Tamanho máximo do círculo = {MAX_RADIUS - 1} px",
 )
 
 
@@ -42,6 +41,8 @@ def detect_edges(image, limit):
 
 # Cria uma coroa circular baseada no raio interno e externo
 def make_coroa_kernel(outer_radius, coroa_width):
+    # outer_radius - raio maximo do filtro
+    # inner_radius - raio do circulo de dentro do filtro
     # Criar template da coroa
     grids = np.mgrid[-outer_radius : outer_radius + 1, -outer_radius : outer_radius + 1]
     kernel_template = grids[0] ** 2 + grids[1] ** 2
@@ -57,7 +58,7 @@ def make_coroa_kernel(outer_radius, coroa_width):
 
     return coroa
 
-
+@st.cache(suppress_st_warning=True)
 def detect_balls(image, list_of_radius, coroa_width):
     # Realizamos uma convolução FFT em todos os raios possíveis do array,
     # considerando a largura da coroa dada.
@@ -68,10 +69,9 @@ def detect_balls(image, list_of_radius, coroa_width):
     # matriz de convolução == kernel
     for index, rad in enumerate(list_of_radius):
         kernel = make_coroa_kernel(rad, coroa_width)
-        convolution_matrix[index, :, :] = fftconvolve(image, kernel, "same")
+        convolution_matrix[index, :, :] = fftconvolve(image, kernel, "same") # same -> o output terá mesmo tamanho do parametro 1
 
     return convolution_matrix
-
 
 # Encontrar o círculo (bola) com maior sinal normalizado da imagem
 def top_circle(convolution_matrix, list_of_radius):
@@ -96,12 +96,11 @@ def top_circle(convolution_matrix, list_of_radius):
             (circle_y, circle_x) = max_positions[index]
             final_radius = radius
 
-        st.info(
-            f"Valor máximo do sinal (raio = {radius} px): {round(maxima[index], ROUND_OUTPUT)}; (y, x) = {max_positions[index]}; sinal normalizado: {round(signal, ROUND_OUTPUT)}"
-        )
+        # st.info(
+        #     f"Valor máximo do sinal (raio = {radius} px): {round(maxima[index], ROUND_OUTPUT)}; (y, x) = {max_positions[index]}; sinal normalizado: {round(signal, ROUND_OUTPUT)}"
+        # )
 
     return ((circle_x, circle_y), final_radius)
-
 
 def run(image):
     if image.ndim > 2:
@@ -121,12 +120,14 @@ def run(image):
         )
 
     # criar kernels e detectar círculos
-    # aqui, não vamos incluir o raio = 205, vai até 200
-    list_of_radius = np.arange(MIN_RADIUS, MAX_RADIUS, RADIUS_STEP)
-    convolution_matrix = detect_balls(edges, list_of_radius, COROA_WIDTH)
-    center, radius = top_circle(convolution_matrix, list_of_radius)
-    st.success(f"Círculo detectado no ponto {center}, com raio = {radius} px")
-    display_results(image, edges, center, radius)
+    # aqui, não vamos incluir o raio = 205, vai até 204
+    with st.spinner("Calculando círculo com maior sinal"): 
+        list_of_radius = np.arange(MIN_RADIUS, MAX_RADIUS)
+        for width in COROA_WIDTH:
+            convolution_matrix = detect_balls(edges, list_of_radius, width)
+            center, radius = top_circle(convolution_matrix, list_of_radius)
+            st.success(f"Círculo detectado no ponto {center}, com raio = {radius} px e largura da coroa circular = {width}")
+            display_results(image, edges, center, radius)
 
 
 def display_results(image, edges, center, radius):
