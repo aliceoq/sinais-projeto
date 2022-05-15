@@ -201,7 +201,9 @@ def main():
                 try:
                     display_image(image, "Imagem original")
                     image = plt.imread(image)
-                    image = resize(image, get_proportion(image.shape))
+                    # Não precisa redimensionar se a imagem já for pequena
+                    if image.shape[1] > IMAGE_WIDTH:
+                        image = resize(image, get_proportion(image.shape))
                     display_image(image, "Imagem após redimensionamento")
                     run(image)
                 except:
