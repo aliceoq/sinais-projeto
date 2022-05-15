@@ -13,12 +13,12 @@ EDGE_LIMIT = 0.005  # Limite do contorno
 ROUND_OUTPUT = 3  # Formatação do valor final a ser mostrado
 MAX_RECOMMENDED_DENSITY = 0.25
 
-# Testes
-COROA_WIDTH = [0, 1, 5, 7.5, 10]
+# Valores setados baseados em testes
+COROA_WIDTH = [1, 3, 5, 7.5, 10]
 INNER_CIRCLE_SCALE = 1.1
 
 # Configuração da página
-st.title("Projeto de sinais")
+st.set_page_config("Projeto de sinais", "⚽")
 st.header("Reconhecer bolas esportivas em uma imagem")
 st.subheader(
     "Considere analisar imagens com círculos de tamanho considerável, pois iremos detectar a bola com maior sinal normalizado, baseado na matriz de convolução"
@@ -31,7 +31,7 @@ st.write(
 
 def display_image(image, label=""):
     try:
-        st.image(image, label)
+        st.image(image, label, clamp=True)
     except:
         st.error(f"Não foi possível disponibilizar a imagem de label: '{label}'")
 
@@ -40,7 +40,6 @@ def detect_edges(image, limit):
     # Aplicação do filtro Sobel na imagem para detecção de contornos
     image = sobel(image, 0) ** 2 + sobel(image, 1) ** 2
     image -= image.min()
-    display_image(image, "Imagem após aplicação do filtro de sobel")
 
     # tornar a imagem binária
     image = image > (image.max() * limit)
@@ -120,7 +119,6 @@ def run(image):
 
     # Uso do filtro gaussiano
     image = gaussian_filter(image, 2)
-    display_image(image, "Imagem após aplicação do filtro gaussiano")
 
     # Definir contornos da imagem e densidade dos sinais
     edges = detect_edges(image, EDGE_LIMIT)
@@ -168,7 +166,7 @@ def display_results(image, edges, center, radius):
         plt.gca().add_patch(blob_circ)
         plt.axis("image")
 
-        st.pyplot(fig)
+        fig
     except:
         st.error(f"Não foi possível plotar as imagens do resultado.")
 
@@ -179,9 +177,12 @@ def main():
         ["jpg", "jpeg", "png", "webp"],
         accept_multiple_files=True,
     )
-    
+
     if st.button("Rodar o programa!"):
         if images:
+            with st.sidebar:
+                st.write("Progresso")
+                progress_bar = st.progress(0)
             count = 1
             start_time = time.time()
             for image in images:
@@ -195,22 +196,25 @@ def main():
                         f"Não foi possível rodar o programa para o teste {count}, tente novamente."
                     )
                 finally:
+                    progress_bar.progress((count) / len(images))
                     count += 1
-            end_time = time.time()
-            full_time = end_time - start_time
-            minutes = full_time // 60
-            if minutes:
-                seconds = full_time - (minutes * 60)
-                st.markdown(
-                    f"#### Tempo de execução: {int(minutes)} minutos e {int(seconds)} segundos"
-                )
-            else:
-                st.markdown(f"#### Tempo de execução: {int(full_time)} segundos")
+            with st.sidebar:
+                end_time = time.time()
+                full_time = end_time - start_time
+                minutes = full_time // 60
+                if minutes:
+                    seconds = full_time - (minutes * 60)
+                    st.markdown(
+                        f"#### Tempo de execução: {int(minutes)} minutos e {int(seconds)} segundos"
+                    )
+                else:
+                    st.markdown(f"#### Tempo de execução: {int(full_time)} segundos")
             st.balloons()  # Finished
         else:
             st.warning(
                 "Parece que você não selecionou nenhuma imagem, tente novamente!"
             )
+            st.stop()
 
 
 main()
