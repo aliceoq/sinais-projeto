@@ -6,14 +6,16 @@ from scipy.signal import fftconvolve
 from scipy.ndimage import gaussian_filter, sobel
 import time
 
-# inicialização das constantes
+# Inicialização das constantes
 MIN_RADIUS = 1
-MAX_RADIUS = 205
-COROA_WIDTH = [0, 1, 5, 10] # testes
-EDGE_LIMIT = 0.005  # limite do contorno
-INNER_CIRCLE_SCALE = 1.1 # testes
-ROUND_OUTPUT = 3
+MAX_RADIUS = 151
+EDGE_LIMIT = 0.005  # Limite do contorno
+ROUND_OUTPUT = 3  # Formatação do valor final a ser mostrado
 MAX_RECOMMENDED_DENSITY = 0.25
+
+# Testes
+COROA_WIDTH = [0, 1, 5, 7.5, 10]
+INNER_CIRCLE_SCALE = 1.1
 
 # Configuração da página
 st.title("Projeto de sinais")
@@ -27,10 +29,18 @@ st.write(
 )
 
 
+def display_image(image, label=""):
+    try:
+        st.image(image, label)
+    except:
+        st.error(f"Não foi possível disponibilizar a imagem de label: '{label}'")
+
+
 def detect_edges(image, limit):
     # Aplicação do filtro Sobel na imagem para detecção de contornos
     image = sobel(image, 0) ** 2 + sobel(image, 1) ** 2
     image -= image.min()
+    display_image(image, "Imagem após aplicação do filtro de sobel")
 
     # tornar a imagem binária
     image = image > (image.max() * limit)
@@ -58,9 +68,10 @@ def make_coroa_kernel(outer_radius, coroa_width):
 
     return coroa
 
-@st.cache(suppress_st_warning=True)
+
+@st.cache(suppress_st_warning=True, show_spinner=False)
 def detect_balls(image, list_of_radius, coroa_width):
-    # Realizamos uma convolução FFT em todos os raios possíveis do array,
+    # Realizamos uma convolução FFT (convolução após a transformada) em todos os raios possíveis do array,
     # considerando a largura da coroa dada.
 
     # Quanto menor o tamanho da coroa -> mais preciso será a transformada
@@ -69,11 +80,15 @@ def detect_balls(image, list_of_radius, coroa_width):
     # matriz de convolução == kernel
     for index, rad in enumerate(list_of_radius):
         kernel = make_coroa_kernel(rad, coroa_width)
-        convolution_matrix[index, :, :] = fftconvolve(image, kernel, "same") # same -> o output terá mesmo tamanho do parametro 1
+        convolution_matrix[index, :, :] = fftconvolve(
+            image, kernel, "same"
+        )  # same -> o output terá mesmo tamanho do parametro 1
 
     return convolution_matrix
 
+
 # Encontrar o círculo (bola) com maior sinal normalizado da imagem
+@st.cache(suppress_st_warning=True, show_spinner=False)
 def top_circle(convolution_matrix, list_of_radius):
     # identificar os cículos com maiores sinais
     maxima = []
@@ -96,11 +111,8 @@ def top_circle(convolution_matrix, list_of_radius):
             (circle_y, circle_x) = max_positions[index]
             final_radius = radius
 
-        # st.info(
-        #     f"Valor máximo do sinal (raio = {radius} px): {round(maxima[index], ROUND_OUTPUT)}; (y, x) = {max_positions[index]}; sinal normalizado: {round(signal, ROUND_OUTPUT)}"
-        # )
-
     return ((circle_x, circle_y), final_radius)
+
 
 def run(image):
     if image.ndim > 2:
@@ -108,6 +120,7 @@ def run(image):
 
     # Uso do filtro gaussiano
     image = gaussian_filter(image, 2)
+    display_image(image, "Imagem após aplicação do filtro gaussiano")
 
     # Definir contornos da imagem e densidade dos sinais
     edges = detect_edges(image, EDGE_LIMIT)
@@ -120,14 +133,18 @@ def run(image):
         )
 
     # criar kernels e detectar círculos
-    # aqui, não vamos incluir o raio = 205, vai até 204
-    with st.spinner("Calculando círculo com maior sinal"): 
-        list_of_radius = np.arange(MIN_RADIUS, MAX_RADIUS)
-        for width in COROA_WIDTH:
+    # aqui, não vamos incluir o raio = 151, vai até 150
+    list_of_radius = np.arange(MIN_RADIUS, MAX_RADIUS)
+    for width in COROA_WIDTH:
+        with st.spinner(
+            f"Calculando círculo com maior sinal para largura da coroa circular = {width} px"
+        ):
             convolution_matrix = detect_balls(edges, list_of_radius, width)
             center, radius = top_circle(convolution_matrix, list_of_radius)
-            st.success(f"Círculo detectado no ponto {center}, com raio = {radius} px e largura da coroa circular = {width}")
-            display_results(image, edges, center, radius)
+        st.success(
+            f"Círculo detectado no ponto {center}, com raio = {radius} px e largura da coroa circular = {width} px"
+        )
+        display_results(image, edges, center, radius)
 
 
 def display_results(image, edges, center, radius):
@@ -152,9 +169,8 @@ def display_results(image, edges, center, radius):
         plt.axis("image")
 
         st.pyplot(fig)
-    except Exception as err:
-        st.error(f"Não foi possível plotar a imagem.")
-        st.exception(err)
+    except:
+        st.error(f"Não foi possível plotar as imagens do resultado.")
 
 
 def main():
@@ -163,6 +179,7 @@ def main():
         ["jpg", "jpeg", "png", "webp"],
         accept_multiple_files=True,
     )
+    
     if st.button("Rodar o programa!"):
         if images:
             count = 1
@@ -170,21 +187,26 @@ def main():
             for image in images:
                 st.markdown(f"## Teste {count}")
                 try:
-                    st.image(image, "Imagem original")
+                    display_image(image, "Imagem original")
                     image = plt.imread(image)
                     run(image)
-                except Exception as err:
+                except:
                     st.error(
                         f"Não foi possível rodar o programa para o teste {count}, tente novamente."
                     )
-                    st.exception(err)
                 finally:
                     count += 1
             end_time = time.time()
-            st.markdown(
-                f"#### Tempo de execução: {round(end_time - start_time, ROUND_OUTPUT)} segundos"
-            )
-            st.balloons() # Finished
+            full_time = end_time - start_time
+            minutes = full_time // 60
+            if minutes:
+                seconds = full_time - (minutes * 60)
+                st.markdown(
+                    f"#### Tempo de execução: {int(minutes)} minutos e {int(seconds)} segundos"
+                )
+            else:
+                st.markdown(f"#### Tempo de execução: {int(full_time)} segundos")
+            st.balloons()  # Finished
         else:
             st.warning(
                 "Parece que você não selecionou nenhuma imagem, tente novamente!"
