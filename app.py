@@ -11,15 +11,16 @@ MIN_RADIUS = 5
 MAX_RADIUS = 205
 RADIUS_STEP = 5  # diferença entre cada raio (no array de raios)
 COROA_WIDTH = 5
-EDGE_LIMIT = 0.005
-NEG_INTERIOR_WEIGHT = 1.1
-
+EDGE_LIMIT = 0.005  # limite do contorno
+INNER_CIRCLE_SCALE = 1.1
 ROUND_OUTPUT = 3
+MAX_RECOMMENDED_DENSITY = 0.25
 
+# Configuração da página
 st.title("Projeto de sinais")
 st.header("Reconhecer bolas esportivas em uma imagem")
 st.subheader(
-    "Considere analisar imagens com círculos de tamanho considerável, pois iremos detectar o maior na imagem"
+    "Considere analisar imagens com círculos de tamanho considerável, pois iremos detectar a bola com maior sinal normalizado, baseado na matriz de convolução"
 )
 st.write(
     f"Tamanho mínimo do círculo = {MIN_RADIUS} px ; ",
@@ -39,25 +40,25 @@ def detect_edges(image, limit):
     return image
 
 
-# NÃO FAÇO IDEIA DO QUE SEJA ISSO
+# Cria uma coroa circular baseada no raio interno e externo
 def make_coroa_kernel(outer_radius, coroa_width):
-    # Cria uma coroa circular baseada no raio interno e externo
-
+    # Criar template da coroa
     grids = np.mgrid[-outer_radius : outer_radius + 1, -outer_radius : outer_radius + 1]
-
     kernel_template = grids[0] ** 2 + grids[1] ** 2
 
-    outer_circle = kernel_template <= outer_radius ** 2
-    inner_circle = kernel_template < (outer_radius - coroa_width) ** 2
+    # Círculos em valores booleanos
+    outer_circle = kernel_template <= (outer_radius ** 2)
+    inner_circle = kernel_template < ((outer_radius - coroa_width) ** 2)
 
     # Transforma os valores para inteiro
     outer_circle.dtype = inner_circle.dtype = np.int8
-    inner_circle = inner_circle * NEG_INTERIOR_WEIGHT
+    inner_circle = inner_circle * INNER_CIRCLE_SCALE
     coroa = outer_circle - inner_circle
+
     return coroa
 
 
-def detect_circles(image, list_of_radius, coroa_width):
+def detect_balls(image, list_of_radius, coroa_width):
     # Realizamos uma convolução FFT em todos os raios possíveis do array,
     # considerando a largura da coroa dada.
 
@@ -72,7 +73,8 @@ def detect_circles(image, list_of_radius, coroa_width):
     return convolution_matrix
 
 
-def top_circles(convolution_matrix, list_of_radius):
+# Encontrar o círculo (bola) com maior sinal normalizado da imagem
+def top_circle(convolution_matrix, list_of_radius):
     # identificar os cículos com maiores sinais
     maxima = []
     max_positions = []
@@ -86,22 +88,19 @@ def top_circles(convolution_matrix, list_of_radius):
         )
         maxima.append(convolution_matrix[index].max())
 
-        # usa o raio para normalizar
+        # usa o raio para normalizar o sinal
         signal = maxima[index] / np.sqrt(float(radius))
 
         if signal > max_signal:
             max_signal = signal
             (circle_y, circle_x) = max_positions[index]
             final_radius = radius
+
         st.info(
             f"Valor máximo do sinal (raio = {radius} px): {round(maxima[index], ROUND_OUTPUT)}; (y, x) = {max_positions[index]}; sinal normalizado: {round(signal, ROUND_OUTPUT)}"
         )
 
-    return (
-        (circle_x, circle_y),
-        final_radius,
-        max_signal,
-    )  # final_radius -> list_of_radius[max_index]
+    return ((circle_x, circle_y), final_radius)
 
 
 def run(image):
@@ -115,42 +114,42 @@ def run(image):
     edges = detect_edges(image, EDGE_LIMIT)
     edge_list = np.array(edges.nonzero())
     density = float(edge_list[0].size) / edges.size
-    st.info(f"Densidade do sinal: {density}")
-    if density > 0.25:
+    st.info(f"Densidade do sinal da imagem: {density}")
+    if density > MAX_RECOMMENDED_DENSITY:
         st.warning(
-            "A densidade do sinal da imagem é muito grande (maior que 0,25). Isso pode afetar consideravelmente na precisão do resultado!"
+            f"A densidade do sinal da imagem é muito grande (maior que {str(MAX_RECOMMENDED_DENSITY).replace('.', ',')}). Isso pode afetar consideravelmente na precisão do resultado!"
         )
 
     # criar kernels e detectar círculos
     # aqui, não vamos incluir o raio = 205, vai até 200
     list_of_radius = np.arange(MIN_RADIUS, MAX_RADIUS, RADIUS_STEP)
-    convolution_matrix = detect_circles(edges, list_of_radius, COROA_WIDTH)
-    center, radius, max_signal = top_circles(convolution_matrix, list_of_radius)
+    convolution_matrix = detect_balls(edges, list_of_radius, COROA_WIDTH)
+    center, radius = top_circle(convolution_matrix, list_of_radius)
     st.success(f"Círculo detectado no ponto {center}, com raio = {radius} px")
     display_results(image, edges, center, radius)
 
 
 def display_results(image, edges, center, radius):
-    # Imagem com o resultado
-    plt.gray()
-    fig = plt.figure(1)
-    fig.clf()
-    subplots = []
-    subplots.append(fig.add_subplot(1, 2, 1))
-    plt.imshow(edges)
-    plt.title("Contornos da imagem")
-
-    # Imagem original
-    subplots.append(fig.add_subplot(1, 2, 2))
-    plt.imshow(image)
-    plt.title(f"Centro: {str(center)}, Raio: {radius} px")
-
-    # Desenhar o círculo detectado
-    blob_circ = plt_patches.Circle(center, radius, fill=False, ec="red")
-    plt.gca().add_patch(blob_circ)
-    plt.axis("image")
-
     try:
+        # Imagem com o contorno
+        plt.gray()
+        fig = plt.figure(1)
+        fig.clf()
+        subplots = []
+        subplots.append(fig.add_subplot(1, 2, 1))
+        plt.imshow(edges)
+        plt.title("Contornos da imagem")
+
+        # Imagem com o resultado
+        subplots.append(fig.add_subplot(1, 2, 2))
+        plt.imshow(image)
+        plt.title(f"Centro: {str(center)}; Raio: {radius} px")
+
+        # Desenhar o círculo detectado
+        blob_circ = plt_patches.Circle(center, radius, fill=False, ec="red")
+        plt.gca().add_patch(blob_circ)
+        plt.axis("image")
+
         st.pyplot(fig)
     except Exception as err:
         st.error(f"Não foi possível plotar a imagem.")
@@ -184,7 +183,7 @@ def main():
             st.markdown(
                 f"#### Tempo de execução: {round(end_time - start_time, ROUND_OUTPUT)} segundos"
             )
-            st.balloons()
+            st.balloons() # Finished
         else:
             st.warning(
                 "Parece que você não selecionou nenhuma imagem, tente novamente!"
