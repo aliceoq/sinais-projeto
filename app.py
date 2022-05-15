@@ -1,5 +1,4 @@
 import streamlit as st
-from skimage.transform import resize
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as plt_patches
@@ -13,7 +12,6 @@ MAX_RADIUS = 151
 EDGE_LIMIT = 0.005  # Limite do contorno
 ROUND_OUTPUT = 3  # Formatação do valor final a ser mostrado
 MAX_RECOMMENDED_DENSITY = 0.25
-IMAGE_WIDTH = 600  # Largura para redimensionar
 
 # Valores setados baseados em testes
 COROA_WIDTH = [1, 3, 5, 7.5, 10]
@@ -115,11 +113,6 @@ def top_circle(convolution_matrix, list_of_radius):
     return ((circle_x, circle_y), final_radius)
 
 
-def get_proportion(image_shape):
-    prop = image_shape[0] / image_shape[1]  # height / width
-    return (IMAGE_WIDTH * prop, IMAGE_WIDTH)
-
-
 def run(image):
     if image.ndim > 2:
         image = np.mean(image, axis=2)
@@ -179,6 +172,7 @@ def display_results(image, edges, center, radius):
 
 
 def main():
+    st.warning("Anexar imagens muito grandes pode afetar o tempo de execução!")
     images = st.file_uploader(
         "Faça o upload de uma imagem ou mais imagens a ser(em) testada(s)",
         ["jpg", "jpeg", "png", "webp"],
@@ -201,10 +195,6 @@ def main():
                 try:
                     display_image(image, "Imagem original")
                     image = plt.imread(image)
-                    # Não precisa redimensionar se a imagem já for pequena
-                    if image.shape[1] > IMAGE_WIDTH:
-                        image = resize(image, get_proportion(image.shape))
-                        display_image(image, "Imagem após redimensionamento")
                     run(image)
                 except:
                     st.error(
