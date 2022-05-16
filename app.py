@@ -210,7 +210,7 @@ def main():
                 if minutes:
                     seconds = full_time - (minutes * 60)
                     st.markdown(
-                        f"#### Tempo de execução: {int(minutes)} minutos e {int(seconds)} segundos"
+                        f"#### Tempo de execução: {int(minutes)} {'minutos' if minutes > 1 else 'minuto'} e {int(seconds)} {'segundos' if seconds > 1 else 'segundo'} "
                     )
                 else:
                     st.markdown(f"#### Tempo de execução: {int(full_time)} segundos")
