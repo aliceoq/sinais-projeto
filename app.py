@@ -214,7 +214,7 @@ def main():
                     )
                 else:
                     st.markdown(f"### Tempo de execução: {int(full_time)} segundos")
-                    st.write("*Reinicie a página para uma nova análise*")
+                st.write("*Reinicie a página para uma nova análise*")
             st.balloons()  # Finished
         else:
             st.warning(
