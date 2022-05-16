@@ -24,8 +24,8 @@ st.subheader(
     "Considere analisar imagens com círculos de tamanho considerável, pois iremos detectar a bola com maior sinal normalizado, baseado na matriz de convolução"
 )
 st.write(
-    f"Tamanho mínimo do círculo = {MIN_RADIUS} px ; ",
-    f"Tamanho máximo do círculo = {MAX_RADIUS - 1} px",
+    f"Raio mínimo do círculo = {MIN_RADIUS} px ; ",
+    f"Raio máximo do círculo = {MAX_RADIUS - 1} px",
 )
 
 
