@@ -18,7 +18,7 @@ COROA_WIDTH = [1, 3, 5, 7.5, 10]
 INNER_CIRCLE_SCALE = 1.1
 
 # Configuração da página
-st.set_page_config("Projeto de sinais", "⚽")
+st.set_page_config("Identificador", "⚽")
 st.header("Reconhecer bolas esportivas em uma imagem")
 st.subheader(
     "Considere analisar imagens com círculos de tamanho considerável, pois iremos detectar a bola com maior sinal normalizado, baseado na matriz de convolução"
@@ -33,7 +33,7 @@ def display_image(image, label=""):
     try:
         st.image(image, label, clamp=True)
     except:
-        st.error(f"Não foi possível disponibilizar a imagem de label: '{label}'")
+        st.error(f"Não foi possível disponibilizar a imagem com label: '{label}'")
 
 
 def detect_edges(image, limit):
